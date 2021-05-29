@@ -6,7 +6,7 @@
 #include <ESP32_Servo.h>
 
 class Pappagallo{
-  protected:
+	protected:
     bool motion_detect= false;
     int trigger, echo;
     Servo head, ali;

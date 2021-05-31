@@ -27,27 +27,64 @@ void AudioIO::ReproduceRecord(){
 		out.loop();
 	}while (isPlaying());
 }
+void AudioIO::fillSamples(byte* buff, int buff_len){
+  int flash_wr_size= 0;
+  
+  while (flash_wr_size < buff_len) {
+        unsigned long t1= micros();
+
+        buff[flash_wr_size]= (byte)(adc1_get_raw(mic_pin)>>1);//get sample from ADC
+        
+        flash_wr_size++; //samples recorder increment
+
+        while (micros()-t1<=64);//wait for get next sample
+  }
+}
+void AudioIO::RecordBuff(int seconds, byte* buff, int buff_len, bool pos, int frequency){
+  int numSamples= seconds*frequency;//Samples of the record
+  
+  formatHeader(header, numSamples+buff_len, 1, frequency, 8);//header of wav file, size of the file (RecordSamples and BuffSamples), num channels, sampling rate, bit per Sample
+  
+  File rec= SPIFFS.open(recordName, FILE_WRITE);
+  rec.write(header, wavHeader);
+
+  if (pos) rec.write(buff, buff_len);
+
+  int flash_wr_size= 0;//Flash size
+
+  while (flash_wr_size < numSamples) {
+        unsigned long t1= micros();
+        
+        byte sample= (byte)(adc1_get_raw(mic_pin)>>1);//get sample from ADC
+        rec.write(sample);//write it on file
+
+        flash_wr_size++; //samples recorder increment
+        while (micros()-t1<=64);//wait for get next sample
+  }
+  if (!pos) rec.write(buff, buff_len);
+  
+  rec.close();
+}
 void AudioIO::Record(int seconds, int frequency){
   int numSamples= seconds*frequency;
- // Serial.println("Recording....");
   
 	formatHeader(header, numSamples, 1, frequency, 8);
 	
 	File rec= SPIFFS.open(recordName, FILE_WRITE);
 	rec.write(header, wavHeader);
-	
+
   int flash_wr_size= 0;
 
 	while (flash_wr_size < numSamples) {
         unsigned long t1= micros();
-        flash_wr_size++; //samples recorder increment
+        
         byte sample= (byte)(adc1_get_raw(mic_pin)>>1);//get sample from ADC
         rec.write(sample);//write it on file
-        ESP.getFreeHeap();
-        while (micros()-t1<=64);//wait for get next sample
+
+        flash_wr_size++; //samples recorder increment
+        while (micros()-t1<=64);//wait for getting next sample
     }
   rec.close();
- // Serial.println("Recorded");
 }
 bool AudioIO::isPlaying(){
 	return out.isRunning();
